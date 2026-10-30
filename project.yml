@@ -1,0 +1,28 @@
+# Fallback: regenerate ServerModules.xcodeproj with XcodeGen (`brew install xcodegen && xcodegen`)
+# if the checked-in project ever gives Xcode trouble.
+name: ServerModules
+options:
+  bundleIdPrefix: com.jdogskizzle
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  ServerModules:
+    type: application
+    platform: iOS
+    sources: [ServerModules]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jdogskizzle.ServerModules
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: Support/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: Server Modules
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: Connects to your server apps on your home network.
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
