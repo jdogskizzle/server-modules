@@ -12,7 +12,7 @@ targets:
     sources: [ServerModules]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.jdogskizzle.ServerModules
+        PRODUCT_BUNDLE_IDENTIFIER: com.jdogskizzle.ServerModule
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES

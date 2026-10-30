@@ -35,7 +35,7 @@ One-time setup:
 
 1. **Apple Developer Program** (paid) at developer.apple.com.
 2. **Bundle ID**: developer.apple.com → Certificates, IDs & Profiles → Identifiers → +,
-   App IDs, App, explicit ID `com.jdogskizzle.ServerModules`.
+   App IDs, App, explicit ID `com.jdogskizzle.ServerModule`.
 3. **App record**: App Store Connect → Apps → + New App, iOS, that bundle ID, any name
    and SKU.
 4. **API key**: App Store Connect → Users and Access → Integrations → App Store Connect
