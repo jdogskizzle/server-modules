@@ -24,6 +24,30 @@ Source files live in folders that Xcode picks up by itself, so a new `.swift` fi
 `ServerModules/` is part of the app without touching the project. If the project file
 ever gives trouble, `xcodegen` regenerates it from `project.yml`.
 
+## TestFlight
+
+Every push to `main` builds the app and uploads it to TestFlight
+(`.github/workflows/testflight.yml`); *Actions → TestFlight → Run workflow* does it by
+hand. Each upload's build number is the workflow's run number. Other branches only get
+the simulator build check (`build.yml`).
+
+One-time setup:
+
+1. **Apple Developer Program** (paid) at developer.apple.com.
+2. **Bundle ID**: developer.apple.com → Certificates, IDs & Profiles → Identifiers → +,
+   App IDs, App, explicit ID `com.jdogskizzle.ServerModules`.
+3. **App record**: App Store Connect → Apps → + New App, iOS, that bundle ID, any name
+   and SKU.
+4. **API key**: App Store Connect → Users and Access → Integrations → App Store Connect
+   API → Team Keys → +, access **Admin**. Note the key ID and the issuer ID, and download
+   the `.p8` file (it can only be downloaded once).
+5. **Repository secrets** (GitHub → Settings → Secrets and variables → Actions):
+   `APPLE_TEAM_ID` (developer.apple.com → Account → Membership details), `ASC_KEY_ID`,
+   `ASC_ISSUER_ID`, and `ASC_KEY_P8` (the whole text of the `.p8` file, including the
+   BEGIN/END lines).
+6. **Testers**: App Store Connect → the app → TestFlight → Internal Testing → add a group
+   with yourself in it, and turn on automatic distribution so new builds reach you.
+
 ## Set up
 
 Open **Settings** in the app and fill in each server's address. Hide a tab you don't

@@ -1,0 +1,102 @@
+# Archives the app, signs it and uploads it to TestFlight on every push to main
+# (or by hand: Actions → TestFlight → Run workflow).
+#
+# Needs these repository secrets (Settings → Secrets and variables → Actions):
+#   APPLE_TEAM_ID    10-character team ID (developer.apple.com → Membership details)
+#   ASC_KEY_ID       App Store Connect API key ID
+#   ASC_ISSUER_ID    App Store Connect API issuer ID
+#   ASC_KEY_P8       the whole contents of the downloaded AuthKey_XXXXXXXXXX.p8 file
+# The API key needs the Admin role, so Xcode can create the signing certificate and
+# provisioning profile itself (cloud-managed signing).
+name: TestFlight
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      # Each upload needs a higher build number than the last; the run number always grows.
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secrets
+        run: |
+          missing=""
+          for s in TEAM_ID KEY_ID ISSUER_ID; do [ -n "${!s}" ] || missing="$missing $s"; done
+          [ -n "${{ secrets.ASC_KEY_P8 }}" ] || missing="$missing ASC_KEY_P8"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing (see the top of .github/workflows/testflight.yml)"
+            exit 1
+          fi
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Write the API key
+        env:
+          KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          printf '%s\n' "$KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+          echo "KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+
+      - name: Archive
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project ServerModules.xcodeproj \
+            -scheme ServerModules \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/ServerModules.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            2>&1 | tee "$RUNNER_TEMP/archive.log" | grep -E "error:|warning: .*(sign|profile|certificate)|ARCHIVE (SUCCEEDED|FAILED)" || true
+          grep -q "ARCHIVE SUCCEEDED" "$RUNNER_TEMP/archive.log"
+
+      - name: Upload to TestFlight
+        run: |
+          set -o pipefail
+          sed "s/TEAM_ID/$TEAM_ID/" ci/ExportOptions.plist > "$RUNNER_TEMP/ExportOptions.plist"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/ServerModules.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
+            2>&1 | tee "$RUNNER_TEMP/export.log" | grep -E "error|Upload succeeded|EXPORT (SUCCEEDED|FAILED)|Uploaded" || true
+          grep -q "EXPORT SUCCEEDED" "$RUNNER_TEMP/export.log"
+          echo "Uploaded build $BUILD_NUMBER. It shows up in TestFlight once Apple finishes processing it (usually 5–15 minutes)."
+
+      - name: Remove the API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-logs
+          path: |
+            ${{ runner.temp }}/archive.log
+            ${{ runner.temp }}/export.log
+          if-no-files-found: ignore

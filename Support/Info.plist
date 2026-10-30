@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyLists-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Only standard HTTPS encryption (exempt), so App Store Connect doesn't ask for
+	     export compliance on every TestFlight build. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<!-- The servers usually speak plain http on the home network or a VPN (e.g. Tailscale),
 	     so allow http to any host. Remove this once everything is behind https. -->
 	<key>NSAppTransportSecurity</key>
