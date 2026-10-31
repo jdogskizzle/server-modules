@@ -95,6 +95,13 @@ struct APIClient: Sendable {
         return http.url?.lastPathComponent == "login" && request.url?.lastPathComponent != "login"
     }
 
+    /// Session cookies for a web view showing this server (empty without a sign-in page).
+    /// Call it after a request succeeded, so the session is known to be current.
+    func webCookies() async throws -> [HTTPCookie] {
+        guard let header = try await formSession?.cookie(refreshing: nil) else { return [] }
+        return FormSession.webCookies(header, for: baseURL)
+    }
+
     func get<T: Decodable>(_ path: String, query: [URLQueryItem] = [], as type: T.Type = T.self) async throws -> T {
         try Self.decode(T.self, from: await data("GET", path, query: query))
     }

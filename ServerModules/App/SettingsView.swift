@@ -103,7 +103,8 @@ struct ServerEditView: View {
                 Text("Login")
             } footer: {
                 switch config.auth {
-                case .form: Text("The server's own sign-in page (formlogin).")
+                case .form: Text(kind == .grafana ? "Grafana's own login. A user that only signs in through single sign-on can't be used here."
+                                                  : "The server's own sign-in page (formlogin).")
                 case .noLogin: Text("Only if the server's sign-in is turned off (…_AUTH=off).")
                 default: Text("For a reverse proxy that asks for a login before the app.")
                 }
@@ -147,7 +148,7 @@ struct ServerEditView: View {
     private func test() async {
         testing = true
         defer { testing = false }
-        guard let client = ServerSettings.makeClient(config, secret: secret) else {
+        guard let client = ServerSettings.makeClient(config, secret: secret, style: kind.loginStyle) else {
             testResult = (false, "That address doesn't look right. Use http://host:port or https://host/path.")
             return
         }

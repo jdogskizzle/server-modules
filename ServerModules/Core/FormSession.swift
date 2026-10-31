@@ -13,7 +13,16 @@ import Foundation
 /// wrong password it stops trying until the login is changed in Settings, so polling
 /// screens can't lock the account out.
 actor FormSession {
+    /// How the server's sign-in works.
+    enum Style: Sendable {
+        /// formlogin: form-encoded `username`/`password`, a 303 on success.
+        case formlogin
+        /// Grafana: JSON `{"user", "password"}` to /login, a 200 on success.
+        case grafana
+    }
+
     let loginURL: URL
+    let style: Style
     let username: String
     let password: String
     /// Keychain account the cookie is saved under (nil: don't save, e.g. for "Test connection").
@@ -27,8 +36,9 @@ actor FormSession {
     /// The server answered /login with "not found": it has no sign-in (formlogin turned off).
     private var noSignIn = false
 
-    init(loginURL: URL, username: String, password: String, storageKey: String?) {
+    init(loginURL: URL, username: String, password: String, storageKey: String?, style: Style = .formlogin) {
         self.loginURL = loginURL
+        self.style = style
         self.username = username
         self.password = password
         self.storageKey = storageKey
@@ -62,8 +72,15 @@ actor FormSession {
     private func signIn() async throws -> String? {
         var req = URLRequest(url: loginURL)
         req.httpMethod = "POST"
-        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        req.httpBody = Data("username=\(Self.formEncode(username))&password=\(Self.formEncode(password))".utf8)
+        switch style {
+        case .formlogin:
+            req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            req.httpBody = Data("username=\(Self.formEncode(username))&password=\(Self.formEncode(password))".utf8)
+        case .grafana:
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.setValue("application/json", forHTTPHeaderField: "Accept")
+            req.httpBody = try JSONEncoder().encode(["user": username, "password": password])
+        }
 
         let result: (Data, URLResponse)
         do {
@@ -78,8 +95,8 @@ actor FormSession {
         guard let http = response as? HTTPURLResponse else { throw APIError("No response from the sign-in page") }
 
         switch http.statusCode {
-        case 300..<400:
-            guard let c = Self.sessionCookie(http) else {
+        case 200..<400:
+            guard let c = Self.sessionCookies(http, url: loginURL) else {
                 throw APIError("The server didn't send a session after signing in. Check the address in Settings.")
             }
             cookie = c
@@ -106,13 +123,30 @@ actor FormSession {
         }
     }
 
-    /// "ledger_session=<value>" from the Set-Cookie header (empty values are sign-outs).
-    static func sessionCookie(_ http: HTTPURLResponse) -> String? {
-        guard let raw = http.value(forHTTPHeaderField: "Set-Cookie") else { return nil }
-        let pair = raw.split(separator: ";", maxSplits: 1).first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
-        let parts = pair.split(separator: "=", maxSplits: 1)
-        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return nil }
-        return pair
+    /// The cookies a sign-in set, as a Cookie header ("ledger_session=…", or Grafana's
+    /// "grafana_session=…; grafana_session_expiry=…"). Empty values are sign-outs.
+    static func sessionCookies(_ http: HTTPURLResponse, url: URL) -> String? {
+        var fields: [String: String] = [:]
+        for (k, v) in http.allHeaderFields {
+            if let k = k as? String, let v = v as? String { fields[k] = v }
+        }
+        let pairs = HTTPCookie.cookies(withResponseHeaderFields: fields, for: url)
+            .filter { !$0.value.isEmpty }
+            .map { "\($0.name)=\($0.value)" }
+        return pairs.isEmpty ? nil : pairs.joined(separator: "; ")
+    }
+
+    /// The session as cookies for a web view showing the same server.
+    static func webCookies(_ header: String, for url: URL) -> [HTTPCookie] {
+        guard let host = url.host else { return [] }
+        let secure = url.scheme?.lowercased() == "https"
+        return header.split(separator: ";").compactMap { part in
+            let kv = part.trimmingCharacters(in: .whitespaces).split(separator: "=", maxSplits: 1).map(String.init)
+            guard kv.count == 2 else { return nil }
+            var props: [HTTPCookiePropertyKey: Any] = [.name: kv[0], .value: kv[1], .domain: host, .path: "/"]
+            if secure { props[.secure] = "TRUE" }
+            return HTTPCookie(properties: props)
+        }
     }
 
     /// application/x-www-form-urlencoded: letters, digits and -._~ as-is, the rest %-escaped.

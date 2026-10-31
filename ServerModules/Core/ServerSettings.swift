@@ -3,7 +3,7 @@ import Observation
 
 /// The four server apps this client knows.
 enum ServerKind: String, CaseIterable, Identifiable, Codable {
-    case miner, musicflow, mcpanel, ledger
+    case miner, musicflow, mcpanel, ledger, grafana
 
     var id: String { rawValue }
 
@@ -13,6 +13,7 @@ enum ServerKind: String, CaseIterable, Identifiable, Codable {
         case .musicflow: return "Music"
         case .mcpanel: return "Minecraft"
         case .ledger: return "Ledger"
+        case .grafana: return "Dashboards"
         }
     }
 
@@ -22,6 +23,7 @@ enum ServerKind: String, CaseIterable, Identifiable, Codable {
         case .musicflow: return "musicflow"
         case .mcpanel: return "mcpanel"
         case .ledger: return "Server fund ledger"
+        case .grafana: return "Grafana"
         }
     }
 
@@ -31,6 +33,7 @@ enum ServerKind: String, CaseIterable, Identifiable, Codable {
         case .musicflow: return "music.note.list"
         case .mcpanel: return "cube"
         case .ledger: return "banknote"
+        case .grafana: return "chart.xyaxis.line"
         }
     }
 
@@ -40,6 +43,7 @@ enum ServerKind: String, CaseIterable, Identifiable, Codable {
         case .musicflow: return "https://homeserver/musicflow"
         case .mcpanel: return "https://homeserver/mcpanel"
         case .ledger: return "http://homeserver:8000"
+        case .grafana: return "http://homeserver:3000"
         }
     }
 
@@ -49,8 +53,12 @@ enum ServerKind: String, CaseIterable, Identifiable, Codable {
         case .musicflow: return "musicflow-web, directly on port 8000 or behind your proxy at /musicflow."
         case .mcpanel: return "mcpanel has no published port: use the address of your reverse proxy."
         case .ledger: return "The ledger web UI (PORT, 8000 by default), or its proxy sub-path."
+        case .grafana: return "Grafana (port 3000 by default), or its proxy sub-path. Sign in with a Grafana user; a viewer is enough."
         }
     }
+
+    /// How "Sign-in page" signs in to this server.
+    var loginStyle: FormSession.Style { self == .grafana ? .grafana : .formlogin }
 
     /// A cheap GET that proves the URL and login work.
     var probePath: String {
@@ -59,6 +67,7 @@ enum ServerKind: String, CaseIterable, Identifiable, Codable {
         case .musicflow: return "api/settings"
         case .mcpanel: return "api/config"
         case .ledger: return "api/summary"
+        case .grafana: return "api/search"
         }
     }
 }
@@ -134,11 +143,11 @@ final class ServerSettings {
         _ = revision
         let c = config(kind)
         let password = secret(kind)
-        return Self.makeClient(c, secret: password) { loginURL in
+        return Self.makeClient(c, secret: password, style: kind.loginStyle) { loginURL in
             let fp = FormSession.fingerprint(loginURL: loginURL, username: c.username, password: password)
             if let existing = self.formSessions[kind], existing.fingerprint == fp { return existing }
             let session = FormSession(loginURL: loginURL, username: c.username, password: password,
-                                      storageKey: Self.sessionKey(kind))
+                                      storageKey: Self.sessionKey(kind), style: kind.loginStyle)
             self.formSessions[kind] = session
             return session
         }
@@ -148,7 +157,7 @@ final class ServerSettings {
 
     /// `formSession` supplies the sign-in session for the server's login URL; by default a
     /// fresh one that isn't saved (as "Test connection" wants).
-    static func makeClient(_ c: ServerConfig, secret: String,
+    static func makeClient(_ c: ServerConfig, secret: String, style: FormSession.Style = .formlogin,
                            formSession: ((URL) -> FormSession)? = nil) -> APIClient? {
         var text = c.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
@@ -162,7 +171,7 @@ final class ServerSettings {
             var client = APIClient(baseURL: url, headerName: nil, headerValue: nil)
             let loginURL = client.url("login")
             client.formSession = formSession?(loginURL)
-                ?? FormSession(loginURL: loginURL, username: c.username, password: secret, storageKey: nil)
+                ?? FormSession(loginURL: loginURL, username: c.username, password: secret, storageKey: nil, style: style)
             return client
         case .basic:
             let token = Data("\(c.username):\(secret)".utf8).base64EncodedString()

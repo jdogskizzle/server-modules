@@ -41,6 +41,7 @@ struct RootView: View {
         case .musicflow: ModuleRoot(kind: kind) { MusicFlowView(client: $0) }
         case .mcpanel: ModuleRoot(kind: kind) { MCPanelView(client: $0) }
         case .ledger: ModuleRoot(kind: kind) { LedgerView(client: $0) }
+        case .grafana: ModuleRoot(kind: kind) { GrafanaView(client: $0) }
         }
     }
 }

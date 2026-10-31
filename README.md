@@ -7,10 +7,12 @@ An iPhone and iPad app (SwiftUI, iOS 17+) for the home-server apps:
 | Miner | [miner](https://github.com/jdogskizzle/miner) control panel | Live status (hashrate, $/day, GPU power and temperature, shares), pause/resume, power mode, pin a coin or go back to automatic, compare prices now, start or cancel a benchmark, coin ranking |
 | Music | [musicflow](https://github.com/jdogskizzle/musicflow) web app | Artists with missing albums, search Soulseek for them, review and pick a source per album, *Download and finish*, re-tag (with or without a new cover), activity with progress, retry/cancel/dismiss and logs, import a folder from the downloads, wanted format, disk space, Jellyfin scan |
 | Minecraft | [mcpanel](https://github.com/jdogskizzle/mcpanel) | Servers with players, version, CPU and memory; start, stop, restart, back up, restore a backup; change type, version, Java or memory; start-at-boot; add a server; task logs |
+| Dashboards | [Grafana](https://grafana.com) | Your dashboards (starred first, by folder, searchable), each opened inside the app with a time-range picker, signed in with the same session |
 | Ledger | [ledger](https://github.com/jdogskizzle/ledger) | Fund balance and payback progress, mining estimate, wishlist with progress and ETA (mark as bought), payouts / purchases / already spent with add, edit and delete, BTC price lookup, payback share, server specs |
 
 Each tab talks to its server's existing JSON API, the same one its web page uses, so
-nothing needs to change on the servers.
+nothing needs to change on the servers. Grafana dashboards are drawn by Grafana itself, in
+a web view that shares the app's sign-in.
 
 ## Build
 
@@ -59,12 +61,14 @@ use with its *Show tab* switch.
 | Music | `http://<host>:8000` or `https://<proxy>/musicflow` | either directly or through your proxy's `/musicflow/` path |
 | Minecraft | `https://<proxy>/mcpanel` (or whatever path you use) | mcpanel has no published port; use your reverse proxy |
 | Ledger | `http://<host>:8000` or `https://<proxy>/ledger` | `PORT` in the ledger's `.env` |
+| Dashboards | `http://<host>:3000` or `https://<proxy>/grafana` | Grafana; sign in with a Grafana user (a viewer is enough) |
 
 Each server has its own sign-in page ([formlogin](https://github.com/jdogskizzle/formlogin)).
 Set each one's **Login** to **Sign-in page** and enter the same username and password as
 in the browser (`<APP>_USERNAME` and the password behind `<APP>_PASSWORD_HASH`). The app
 posts them to the server's `login` page, keeps the 30-day session cookie in the Keychain,
-and signs in again by itself when the session runs out. After a wrong password it stops
+and signs in again by itself when the session runs out. For Grafana, **Sign-in page** is
+Grafana's own login (users that only sign in through single sign-on can't be used). After a wrong password it stops
 trying until you change the login, because formlogin locks an address out for 15 minutes
 after 5 failures. *Test connection* signs in with what's on screen without saving anything.
 
@@ -88,6 +92,7 @@ ServerModules/
     MusicFlow/    artists, album search and picking, activity, import
     MCPanel/      servers, server detail, version change, add server, tasks
     Ledger/       dashboard, tables, forms, server specs
+    Grafana/      dashboard list and the in-app dashboard viewer
 Support/Info.plist
 ```
 
