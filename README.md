@@ -60,11 +60,18 @@ use with its *Show tab* switch.
 | Minecraft | `https://<proxy>/mcpanel` (or whatever path you use) | mcpanel has no published port; use your reverse proxy |
 | Ledger | `http://<host>:8000` or `https://<proxy>/ledger` | `PORT` in the ledger's `.env` |
 
-None of these apps have a login of their own. Reach them on your home network or over a
-VPN such as Tailscale, or through a reverse proxy that asks for a login. For that last
-case, each server has a **Login** setting: username and password (HTTP Basic), a bearer
-token, or a custom header (e.g. a Cloudflare Access service token). Passwords and tokens
-are kept in the iOS Keychain on the device. *Test connection* checks the address and login.
+Each server has its own sign-in page ([formlogin](https://github.com/jdogskizzle/formlogin)).
+Set each one's **Login** to **Sign-in page** and enter the same username and password as
+in the browser (`<APP>_USERNAME` and the password behind `<APP>_PASSWORD_HASH`). The app
+posts them to the server's `login` page, keeps the 30-day session cookie in the Keychain,
+and signs in again by itself when the session runs out. After a wrong password it stops
+trying until you change the login, because formlogin locks an address out for 15 minutes
+after 5 failures. *Test connection* signs in with what's on screen without saving anything.
+
+The other login types are for a reverse proxy that asks for a login before the app
+(HTTP Basic, a bearer token, or a custom header such as a Cloudflare Access service
+token). *None* is for a server whose sign-in is turned off (`<APP>_AUTH=off`).
+Passwords, tokens and session cookies stay in the iOS Keychain on the device.
 
 `Support/Info.plist` allows plain `http://` to any host, since the servers usually run
 without TLS at home. Remove `NSAllowsArbitraryLoads` once everything is behind https.

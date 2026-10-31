@@ -17,7 +17,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Servers")
                 } footer: {
-                    Text("None of these apps have a login of their own. Reach them over your home network or a VPN (e.g. Tailscale), or through a reverse proxy that asks for a login, and enter that login here.")
+                    Text("Each app has its own sign-in page: choose “Sign-in page” and enter the same username and password you use in the browser. The app stays signed in and signs in again when the session runs out.")
                 }
             }
             .navigationTitle("Settings")
@@ -70,13 +70,20 @@ struct ServerEditView: View {
             } footer: {
                 Text(kind.setupNote)
             }
-            Section("Login") {
+            Section {
                 Picker("Type", selection: $config.auth) {
                     ForEach(AuthMode.allCases) { Text($0.label).tag($0) }
                 }
                 switch config.auth {
                 case .noLogin:
                     EmptyView()
+                case .form:
+                    TextField("Username", text: $config.username)
+                        .textContentType(.username)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    SecureField("Password", text: $secret)
+                        .textContentType(.password)
                 case .basic:
                     TextField("Username", text: $config.username)
                         .textContentType(.username)
@@ -91,6 +98,14 @@ struct ServerEditView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     SecureField("Header value", text: $secret)
+                }
+            } header: {
+                Text("Login")
+            } footer: {
+                switch config.auth {
+                case .form: Text("The server's own sign-in page (formlogin).")
+                case .noLogin: Text("Only if the server's sign-in is turned off (…_AUTH=off).")
+                default: Text("For a reverse proxy that asks for a login before the app.")
                 }
             }
             Section {

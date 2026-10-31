@@ -47,7 +47,7 @@ enum ServerKind: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .miner: return "The miner's control panel (CONTROL_PORT, 8095 by default)."
         case .musicflow: return "musicflow-web, directly on port 8000 or behind your proxy at /musicflow."
-        case .mcpanel: return "mcpanel has no published port: use the address of your reverse proxy, with its login below."
+        case .mcpanel: return "mcpanel has no published port: use the address of your reverse proxy."
         case .ledger: return "The ledger web UI (PORT, 8000 by default), or its proxy sub-path."
         }
     }
@@ -64,12 +64,13 @@ enum ServerKind: String, CaseIterable, Identifiable, Codable {
 }
 
 enum AuthMode: String, Codable, CaseIterable, Identifiable {
-    case noLogin = "none", basic, bearer, header
+    case noLogin = "none", form, basic, bearer, header
     var id: String { rawValue }
     var label: String {
         switch self {
         case .noLogin: return "None"
-        case .basic: return "Username & password"
+        case .form: return "Sign-in page"
+        case .basic: return "Proxy username & password"
         case .bearer: return "Bearer token"
         case .header: return "Custom header"
         }
@@ -79,7 +80,7 @@ enum AuthMode: String, Codable, CaseIterable, Identifiable {
 struct ServerConfig: Codable, Equatable {
     var enabled = true
     var baseURL = ""
-    var auth: AuthMode = .noLogin
+    var auth: AuthMode = .form
     var username = ""
     var headerName = ""
 }
@@ -92,6 +93,10 @@ final class ServerSettings {
     private(set) var revision = 0
 
     private static let defaultsKey = "serverConfigs.v1"
+
+    /// One sign-in session per server, shared by every client made for it, so screens
+    /// don't each sign in. Replaced when the URL or login changes.
+    @ObservationIgnored private var formSessions: [ServerKind: FormSession] = [:]
 
     init() {
         var loaded: [ServerKind: ServerConfig] = [:]
@@ -112,6 +117,9 @@ final class ServerSettings {
         c.baseURL = c.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         configs[kind] = c
         Keychain.write(c.auth == .noLogin ? nil : secret, for: "secret.\(kind.rawValue)")
+        // Sign in afresh with the saved login.
+        Keychain.write(nil, for: Self.sessionKey(kind))
+        formSessions[kind] = nil
         let raw = Dictionary(uniqueKeysWithValues: configs.map { ($0.key.rawValue, $0.value) })
         if let data = try? JSONEncoder().encode(raw) {
             UserDefaults.standard.set(data, forKey: Self.defaultsKey)
@@ -124,10 +132,24 @@ final class ServerSettings {
     /// A client for the server, or nil while its URL isn't set.
     func client(_ kind: ServerKind) -> APIClient? {
         _ = revision
-        return Self.makeClient(config(kind), secret: secret(kind))
+        let c = config(kind)
+        let password = secret(kind)
+        return Self.makeClient(c, secret: password) { loginURL in
+            let fp = FormSession.fingerprint(loginURL: loginURL, username: c.username, password: password)
+            if let existing = self.formSessions[kind], existing.fingerprint == fp { return existing }
+            let session = FormSession(loginURL: loginURL, username: c.username, password: password,
+                                      storageKey: Self.sessionKey(kind))
+            self.formSessions[kind] = session
+            return session
+        }
     }
 
-    static func makeClient(_ c: ServerConfig, secret: String) -> APIClient? {
+    private static func sessionKey(_ kind: ServerKind) -> String { "session.\(kind.rawValue)" }
+
+    /// `formSession` supplies the sign-in session for the server's login URL; by default a
+    /// fresh one that isn't saved (as "Test connection" wants).
+    static func makeClient(_ c: ServerConfig, secret: String,
+                           formSession: ((URL) -> FormSession)? = nil) -> APIClient? {
         var text = c.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
         if !text.contains("://") { text = "http://" + text }
@@ -136,6 +158,12 @@ final class ServerSettings {
         switch c.auth {
         case .noLogin:
             return APIClient(baseURL: url, headerName: nil, headerValue: nil)
+        case .form:
+            var client = APIClient(baseURL: url, headerName: nil, headerValue: nil)
+            let loginURL = client.url("login")
+            client.formSession = formSession?(loginURL)
+                ?? FormSession(loginURL: loginURL, username: c.username, password: secret, storageKey: nil)
+            return client
         case .basic:
             let token = Data("\(c.username):\(secret)".utf8).base64EncodedString()
             return APIClient(baseURL: url, headerName: "Authorization", headerValue: "Basic \(token)")

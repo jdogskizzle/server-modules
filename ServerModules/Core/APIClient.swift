@@ -12,15 +12,23 @@ struct APIClient: Sendable {
     let baseURL: URL
     let headerName: String?
     let headerValue: String?
+    /// Set for servers with a formlogin sign-in page: signs in and supplies the session cookie.
+    var formSession: FormSession? = nil
 
     /// Changes whenever the URL or login changes, so views can rebuild their stores.
-    var identity: String { "\(baseURL.absoluteString)|\(headerName ?? "")|\(headerValue?.hashValue ?? 0)" }
+    var identity: String {
+        "\(baseURL.absoluteString)|\(headerName ?? "")|\(headerValue?.hashValue ?? 0)|\(formSession?.fingerprint ?? "")"
+    }
 
     static let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 20
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.urlCache = nil
+        // Session cookies are handled by FormSession, per server.
+        config.httpCookieStorage = nil
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
         return URLSession(configuration: config)
     }()
 
@@ -52,20 +60,39 @@ struct APIClient: Sendable {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONEncoder().encode(body)
         }
+        var cookie = try await formSession?.cookie(refreshing: nil)
+        var (data, http) = try await Self.perform(req, cookie: cookie)
+        if let formSession, Self.signedOut(http, request: req) {
+            // The session expired or was revoked: sign in again and retry once.
+            cookie = try await formSession.cookie(refreshing: cookie)
+            (data, http) = try await Self.perform(req, cookie: cookie)
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError(Self.errorMessage(data, status: http.statusCode))
+        }
+        return data
+    }
+
+    private static func perform(_ request: URLRequest, cookie: String?) async throws -> (Data, HTTPURLResponse) {
+        var req = request
+        if let cookie { req.setValue(cookie, forHTTPHeaderField: "Cookie") }
         let result: (Data, URLResponse)
         do {
-            result = try await Self.session.data(for: req)
+            result = try await session.data(for: req)
         } catch let e as URLError where e.code == .cancelled {
             throw CancellationError()
         } catch {
             throw APIError(error.localizedDescription)
         }
-        let (data, response) = result
-        guard let http = response as? HTTPURLResponse else { throw APIError("No response from the server") }
-        guard (200..<300).contains(http.statusCode) else {
-            throw APIError(Self.errorMessage(data, status: http.statusCode))
-        }
-        return data
+        guard let http = result.1 as? HTTPURLResponse else { throw APIError("No response from the server") }
+        return (result.0, http)
+    }
+
+    /// formlogin refused the session: a 401 for API calls, or a redirect to the sign-in
+    /// page for anything else (e.g. ledger's /img/ thumbnails).
+    private static func signedOut(_ http: HTTPURLResponse, request: URLRequest) -> Bool {
+        if http.statusCode == 401 { return true }
+        return http.url?.lastPathComponent == "login" && request.url?.lastPathComponent != "login"
     }
 
     func get<T: Decodable>(_ path: String, query: [URLQueryItem] = [], as type: T.Type = T.self) async throws -> T {
@@ -108,7 +135,12 @@ struct APIClient: Sendable {
     static func errorMessage(_ data: Data, status: Int) -> String {
         if let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
             if let e = obj["error"] as? String { return e }
-            if let d = obj["detail"] as? String { return d }
+            if let d = obj["detail"] as? String {
+                if d == "not signed in" {
+                    return "This server has a sign-in page. In Settings, set its login to “Sign-in page” and enter your username and password."
+                }
+                return d
+            }
             if let list = obj["detail"] as? [[String: Any]], let msg = list.first?["msg"] as? String { return msg }
         }
         if status == 401 || status == 403 {
