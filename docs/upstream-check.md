@@ -59,9 +59,11 @@ the app has been checked against.
 
 5. **Build check.** Commit (as above) and push the working branch. Wait for the `Build`
    workflow run on that commit (`gh api "repos/jdogskizzle/server-modules/actions/workflows/build.yml/runs?per_page=5"`,
-   then the job log via the GitHub MCP `get_job_logs` tool). If it fails, read the
-   `error:` lines, fix, and push again; after 3 failed attempts stop without touching
-   `main` and say so in the report.
+   then `gh api repos/jdogskizzle/server-modules/actions/runs/<run id>/jobs --jq '.jobs[0].id'`
+   and `gh api repos/jdogskizzle/server-modules/actions/jobs/<job id>/logs | grep -E "error:|BUILD (SUCCEEDED|FAILED)"`;
+   the `gh` CLI works in scheduled sessions, where the GitHub MCP tools may be missing). If it
+   fails, read the `error:` lines, fix, and push again; after 3 failed attempts stop without
+   touching `main` and say so in the report.
 
 6. **Record the check.** Set each repo's `commit` in `upstream.json` to the `origin/HEAD`
    just reviewed, and commit that too (with the app change, or on its own when nothing in the
