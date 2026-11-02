@@ -54,6 +54,14 @@ One-time setup:
 6. **Testers**: App Store Connect → the app → TestFlight → Internal Testing → add a group
    with yourself in it, and turn on automatic distribution so new builds reach you.
 
+## Daily upstream check
+
+A scheduled task checks the server repos once a day and keeps the app in step with them:
+it reads what changed since the last check, changes the app if the servers' APIs or sign-in
+changed, and ships a TestFlight build once the build check passes. The procedure is in
+[`docs/upstream-check.md`](docs/upstream-check.md); the last commit checked for each repo is
+in [`upstream.json`](upstream.json).
+
 ## Set up
 
 Open **Settings** in the app and fill in each server's address. Hide a service you don't
