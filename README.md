@@ -1,16 +1,20 @@
 # Server Modules
 
-An iPhone and iPad app (SwiftUI, iOS 17+) for the home-server apps:
+An iPhone and iPad app (SwiftUI, iOS 17+) for the home-server apps. **Home** lists every
+service with a live one-line status (what's recording, what's mining, the fund balance…);
+tap one for its full screen. **Settings** holds each server's address and login.
 
-| Tab | Server | What you can do |
+| Service | Server | What you can do |
 |---|---|---|
+| DVR | [dvr-guard](https://github.com/jdogskizzle/dvr-guard) status page | What's recording, what's scheduled (cancel or stop), recent recordings with missing seconds and tuner overlaps, followed games, and what each tuned channel is serving |
+| TV ad mute | [admute](https://github.com/jdogskizzle/admute) studio | Live: the open channel, whether it's muting, the logo match and ads muted; recent mute events; recordings (start a survey); jobs with logs and Stop; the studio itself for labelling and tuning |
 | Miner | [miner](https://github.com/jdogskizzle/miner) control panel | Live status (hashrate, $/day, GPU power and temperature, shares), pause/resume, power mode, pin a coin or go back to automatic, compare prices now, start or cancel a benchmark, coin ranking |
 | Music | [musicflow](https://github.com/jdogskizzle/musicflow) web app | Artists with missing albums, search Soulseek for them, review and pick a source per album, *Download and finish*, re-tag (with or without a new cover), activity with progress, retry/cancel/dismiss and logs, import a folder from the downloads, wanted format, disk space, Jellyfin scan |
 | Minecraft | [mcpanel](https://github.com/jdogskizzle/mcpanel) | Servers with players, version, CPU and memory; start, stop, restart, back up, restore a backup; change type, version, Java or memory; start-at-boot; add a server; task logs |
 | Dashboards | [Grafana](https://grafana.com) | Your dashboards (starred first, by folder, searchable), each opened inside the app with a time-range picker, signed in with the same session |
 | Ledger | [ledger](https://github.com/jdogskizzle/ledger) | Fund balance and payback progress, mining estimate, wishlist with progress and ETA (mark as bought), payouts / purchases / already spent with add, edit and delete, BTC price lookup, payback share, server specs |
 
-Each tab talks to its server's existing JSON API, the same one its web page uses, so
+Each service talks to its server's existing JSON API, the same one its web page uses, so
 nothing needs to change on the servers. Grafana dashboards are drawn by Grafana itself, in
 a web view that shares the app's sign-in.
 
@@ -52,8 +56,8 @@ One-time setup:
 
 ## Set up
 
-Open **Settings** in the app and fill in each server's address. Hide a tab you don't
-use with its *Show tab* switch.
+Open **Settings** in the app and fill in each server's address. Hide a service you don't
+use with its *Show on Home* switch.
 
 | Server | Address | Notes |
 |---|---|---|
@@ -61,6 +65,8 @@ use with its *Show tab* switch.
 | Music | `http://<host>:8000` or `https://<proxy>/musicflow` | either directly or through your proxy's `/musicflow/` path |
 | Minecraft | `https://<proxy>/mcpanel` (or whatever path you use) | mcpanel has no published port; use your reverse proxy |
 | Ledger | `http://<host>:8000` or `https://<proxy>/ledger` | `PORT` in the ledger's `.env` |
+| DVR | `https://<proxy>/dvr` | dvr-guard has no published port; its status page behind your proxy |
+| TV ad mute | `https://<proxy>/admute` | admute's studio (no published port) behind your proxy |
 | Dashboards | `http://<host>:3000` or `https://<proxy>/grafana` | Grafana; sign in with a Grafana user (a viewer is enough) |
 
 Each server has its own sign-in page ([formlogin](https://github.com/jdogskizzle/formlogin)).
@@ -84,7 +90,7 @@ without TLS at home. Remove `NSAllowsArbitraryLoads` once everything is behind h
 
 ```
 ServerModules/
-  App/            app entry, tabs, Settings screens
+  App/            app entry, Home (service list and status lines), Settings
   Core/           API client, JSON helpers, server settings, Keychain
   Shared/         formatting and small reusable views (stat tiles, banners, polling)
   Modules/
@@ -93,6 +99,8 @@ ServerModules/
     MCPanel/      servers, server detail, version change, add server, tasks
     Ledger/       dashboard, tables, forms, server specs
     Grafana/      dashboard list and the in-app dashboard viewer
+    DVR/          dvr-guard: recording now, schedule, recent, tuners
+    Admute/       admute studio: live, events, recordings, jobs
 Support/Info.plist
 ```
 

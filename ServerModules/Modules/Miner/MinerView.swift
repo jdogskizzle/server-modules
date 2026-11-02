@@ -51,7 +51,7 @@ struct MinerView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        Group {
             Group {
                 if let s = store.status {
                     content(s)

@@ -1,75 +1,55 @@
 import Foundation
 import Observation
 
-/// The four server apps this client knows.
+/// The server apps this client knows. The order is the order on the Home page.
 enum ServerKind: String, CaseIterable, Identifiable, Codable {
-    case miner, musicflow, mcpanel, ledger, grafana
+    case musicflow, dvr, admute, miner, ledger, mcpanel, grafana
 
     var id: String { rawValue }
 
-    var title: String {
+    private var info: (title: String, appName: String, systemImage: String, urlHint: String,
+                       setupNote: String, probePath: String, group: String) {
         switch self {
-        case .miner: return "Miner"
-        case .musicflow: return "Music"
-        case .mcpanel: return "Minecraft"
-        case .ledger: return "Ledger"
-        case .grafana: return "Dashboards"
+        case .musicflow:
+            return ("Music", "musicflow", "music.note.list", "https://homeserver/musicflow",
+                    "musicflow-web, directly on port 8000 or behind your proxy at /musicflow.",
+                    "api/settings", "Media")
+        case .dvr:
+            return ("DVR", "dvr-guard", "record.circle", "https://homeserver/dvr",
+                    "dvr-guard's status page, behind your proxy (e.g. /dvr).", "api/status", "Media")
+        case .admute:
+            return ("TV ad mute", "admute studio", "speaker.slash", "https://homeserver/admute",
+                    "admute's studio, behind your proxy (e.g. /admute).", "api/live", "Media")
+        case .miner:
+            return ("Miner", "GPU miner control", "cpu", "http://homeserver:8095",
+                    "The miner's control panel (CONTROL_PORT, 8095 by default).", "api/status", "Server")
+        case .ledger:
+            return ("Ledger", "Server fund ledger", "banknote", "http://homeserver:8000",
+                    "The ledger web UI (PORT, 8000 by default), or its proxy sub-path.", "api/summary", "Server")
+        case .mcpanel:
+            return ("Minecraft", "mcpanel", "cube", "https://homeserver/mcpanel",
+                    "mcpanel has no published port: use the address of your reverse proxy.", "api/config", "Games")
+        case .grafana:
+            return ("Dashboards", "Grafana", "chart.xyaxis.line", "http://homeserver:3000",
+                    "Grafana (port 3000 by default), or its proxy sub-path. Sign in with a Grafana user; a viewer is enough.",
+                    "api/search", "Server")
         }
     }
 
-    var appName: String {
-        switch self {
-        case .miner: return "GPU miner control"
-        case .musicflow: return "musicflow"
-        case .mcpanel: return "mcpanel"
-        case .ledger: return "Server fund ledger"
-        case .grafana: return "Grafana"
-        }
-    }
+    var title: String { info.title }
+    var appName: String { info.appName }
+    var systemImage: String { info.systemImage }
+    var urlHint: String { info.urlHint }
+    var setupNote: String { info.setupNote }
+    /// A cheap GET that proves the URL and login work.
+    var probePath: String { info.probePath }
+    /// The Home page section it's listed under.
+    var group: String { info.group }
 
-    var systemImage: String {
-        switch self {
-        case .miner: return "cpu"
-        case .musicflow: return "music.note.list"
-        case .mcpanel: return "cube"
-        case .ledger: return "banknote"
-        case .grafana: return "chart.xyaxis.line"
-        }
-    }
-
-    var urlHint: String {
-        switch self {
-        case .miner: return "http://homeserver:8095"
-        case .musicflow: return "https://homeserver/musicflow"
-        case .mcpanel: return "https://homeserver/mcpanel"
-        case .ledger: return "http://homeserver:8000"
-        case .grafana: return "http://homeserver:3000"
-        }
-    }
-
-    var setupNote: String {
-        switch self {
-        case .miner: return "The miner's control panel (CONTROL_PORT, 8095 by default)."
-        case .musicflow: return "musicflow-web, directly on port 8000 or behind your proxy at /musicflow."
-        case .mcpanel: return "mcpanel has no published port: use the address of your reverse proxy."
-        case .ledger: return "The ledger web UI (PORT, 8000 by default), or its proxy sub-path."
-        case .grafana: return "Grafana (port 3000 by default), or its proxy sub-path. Sign in with a Grafana user; a viewer is enough."
-        }
-    }
+    static let groups = ["Media", "Server", "Games"]
 
     /// How "Sign-in page" signs in to this server.
     var loginStyle: FormSession.Style { self == .grafana ? .grafana : .formlogin }
-
-    /// A cheap GET that proves the URL and login work.
-    var probePath: String {
-        switch self {
-        case .miner: return "api/status"
-        case .musicflow: return "api/settings"
-        case .mcpanel: return "api/config"
-        case .ledger: return "api/summary"
-        case .grafana: return "api/search"
-        }
-    }
 }
 
 enum AuthMode: String, Codable, CaseIterable, Identifiable {

@@ -1,5 +1,4 @@
 import SwiftUI
-import WebKit
 
 /// One result of GET /api/search?type=dash-db.
 struct GrafanaDashboard: Decodable, Identifiable, Hashable {
@@ -41,7 +40,7 @@ struct GrafanaView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        Group {
             List {
                 if let e = store.error {
                     Section { ErrorBanner(message: e) }
@@ -143,7 +142,7 @@ struct GrafanaDashboardView: View {
     var body: some View {
         Group {
             if let cookies {
-                GrafanaWebView(url: url, cookies: cookies, reload: reload, loading: $loading)
+                ServiceWebView(url: url, cookies: cookies, reload: reload, loading: $loading)
                     .ignoresSafeArea(edges: .bottom)
                     .overlay(alignment: .top) {
                         if loading { ProgressView().padding(.top, 8) }
@@ -195,71 +194,6 @@ struct GrafanaDashboardView: View {
         } catch is CancellationError {
         } catch {
             self.error = error.localizedDescription
-        }
-    }
-}
-
-struct GrafanaWebView: UIViewRepresentable {
-    let url: URL
-    let cookies: [HTTPCookie]
-    let reload: Int
-    @Binding var loading: Bool
-
-    func makeCoordinator() -> Coordinator { Coordinator(loading: $loading) }
-
-    func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.websiteDataStore = .default()
-        let view = WKWebView(frame: .zero, configuration: config)
-        view.navigationDelegate = context.coordinator
-        view.allowsBackForwardNavigationGestures = true
-        view.isOpaque = false
-        view.backgroundColor = .systemBackground
-        context.coordinator.load(url, cookies: cookies, reload: reload, in: view)
-        return view
-    }
-
-    func updateUIView(_ view: WKWebView, context: Context) {
-        context.coordinator.loading = $loading
-        if context.coordinator.loadedURL != url {
-            context.coordinator.load(url, cookies: cookies, reload: reload, in: view)
-        } else if context.coordinator.reload != reload {
-            context.coordinator.reload = reload
-            view.reload()
-        }
-    }
-
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        var loading: Binding<Bool>
-        var loadedURL: URL?
-        var reload = 0
-
-        init(loading: Binding<Bool>) { self.loading = loading }
-
-        func load(_ url: URL, cookies: [HTTPCookie], reload: Int, in view: WKWebView) {
-            loadedURL = url
-            self.reload = reload
-            let store = view.configuration.websiteDataStore.httpCookieStore
-            Task { @MainActor in
-                for c in cookies { await store.setCookie(c) }
-                view.load(URLRequest(url: url))
-            }
-        }
-
-        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-            loading.wrappedValue = true
-        }
-
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            loading.wrappedValue = false
-        }
-
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            loading.wrappedValue = false
-        }
-
-        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-            loading.wrappedValue = false
         }
     }
 }

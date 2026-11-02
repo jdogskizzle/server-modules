@@ -13,19 +13,17 @@ struct ModuleRoot<Content: View>: View {
         if let client = settings.client(kind) {
             content(client).id(client.identity)
         } else {
-            NavigationStack {
-                ContentUnavailableView {
-                    Label("\(kind.title) isn't set up", systemImage: kind.systemImage)
-                } description: {
-                    Text("Add the address of your \(kind.appName) server.")
-                } actions: {
-                    Button("Set up \(kind.title)") { showSettings = true }
-                        .buttonStyle(.borderedProminent)
-                }
-                .navigationTitle(kind.title)
-                .sheet(isPresented: $showSettings) {
-                    NavigationStack { ServerEditView(kind: kind) }
-                }
+            ContentUnavailableView {
+                Label("\(kind.title) isn't set up", systemImage: kind.systemImage)
+            } description: {
+                Text("Add the address of your \(kind.appName) server.")
+            } actions: {
+                Button("Set up \(kind.title)") { showSettings = true }
+                    .buttonStyle(.borderedProminent)
+            }
+            .navigationTitle(kind.title)
+            .sheet(isPresented: $showSettings) {
+                NavigationStack { ServerEditView(kind: kind) }
             }
         }
     }

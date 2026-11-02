@@ -56,7 +56,7 @@ struct LedgerView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        Group {
             List {
                 if let e = store.error {
                     Section { ErrorBanner(message: e) }

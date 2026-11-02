@@ -57,7 +57,7 @@ struct ServerEditView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Show \(kind.title) tab", isOn: $config.enabled)
+                Toggle("Show on Home", isOn: $config.enabled)
             }
             Section {
                 TextField(kind.urlHint, text: $config.baseURL)

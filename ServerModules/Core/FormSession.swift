@@ -105,7 +105,11 @@ actor FormSession {
             return c
         case 401:
             // Don't try again with the same password; the server locks out after 5 failures.
-            let e = APIError("Wrong username or password. Fix the login in Settings.")
+            // formlogin v2 shows a setup page (asking for a one-time code) until a password is set.
+            let page = String(decoding: body, as: UTF8.self)
+            let e = page.localizedCaseInsensitiveContains("setup code")
+                ? APIError("This server has no password yet. Set one in a browser first (the setup code is in the server's log), then sign in here.")
+                : APIError("Wrong username or password. Fix the login in Settings.")
             failure = (e, .distantFuture)
             throw e
         case 429:
