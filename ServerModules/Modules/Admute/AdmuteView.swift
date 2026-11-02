@@ -92,7 +92,28 @@ struct AdmuteRecordings: Decodable {
         let length: Double?
         let breaks: Int?
         let job: AdmuteJob?
+        /// Mutes answered in the review, and whether missed ads were looked for.
+        let checked: Int?
+        let missedChecked: Bool?
         var id: String { name }
+
+        enum CodingKeys: String, CodingKey {
+            case name, title, size, modified, recording, surveyed, labelled, length, breaks, job, checked
+            case missedChecked = "missed_checked"
+        }
+    }
+}
+
+/// GET /api/scene: the image model that decides mutes once trained on reviewed games.
+struct AdmuteScene: Decodable {
+    let trained: Bool
+    let trainedOn: [String]?
+    let titles: [String]?
+    let seconds: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case trained, titles, seconds
+        case trainedOn = "trained_on"
     }
 }
 
@@ -104,6 +125,7 @@ final class AdmuteStore {
     var live: AdmuteLive?
     var jobs: [AdmuteJob]?
     var recordings: [AdmuteRecordings.Recording]?
+    var scene: AdmuteScene?
     var error: String?
     var notice: String?
 
@@ -123,6 +145,19 @@ final class AdmuteStore {
     func refreshJobs() async { await load { self.jobs = try await self.client.get("api/jobs", as: [AdmuteJob].self) } }
     func refreshRecordings() async {
         await load { self.recordings = try await self.client.get("api/recordings", as: AdmuteRecordings.self).recordings }
+    }
+
+    func refreshScene() async {
+        // Older studios have no scene check; leave it out rather than show an error.
+        scene = try? await client.get("api/scene", as: AdmuteScene.self)
+    }
+
+    func train() async {
+        await load {
+            let job: AdmuteJob = try await self.client.fetch("POST", "api/jobs", body: ["kind": "train", "name": ""])
+            self.notice = "\(job.what ?? "Training") started. Follow it under Jobs."
+        }
+        await refreshScene()
     }
 
     func survey(_ name: String, fresh: Bool) async {
@@ -163,7 +198,7 @@ struct AdmuteView: View {
                     NavigationLink {
                         AdmuteRecordingsView(store: store)
                     } label: {
-                        Label("Recordings", systemImage: "film.stack")
+                        Label("Recordings and review", systemImage: "film.stack")
                     }
                     NavigationLink {
                         AdmuteJobsView(store: store)
@@ -176,7 +211,7 @@ struct AdmuteView: View {
                         Label("Open the studio", systemImage: "safari")
                     }
                 } footer: {
-                    Text("Labelling ads and tuning the detector are in the studio, which is easier on a bigger screen.")
+                    Text("Review a recording to check its mutes and mark missed ads; your answers become its labels. Tuning the detector is in the studio.")
                 }
                 eventsSection(live.events ?? [])
             } else if store.error == nil {
@@ -276,23 +311,69 @@ struct AdmuteRecordingsView: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
             }
+            if let scene = store.scene { sceneSection(scene) }
             if let recs = store.recordings {
-                if recs.isEmpty {
-                    Text("No recordings in the recordings folder.").foregroundStyle(.secondary)
-                }
-                ForEach(recs) { r in
-                    row(r)
+                Section {
+                    if recs.isEmpty {
+                        Text("No recordings in the recordings folder.").foregroundStyle(.secondary)
+                    }
+                    ForEach(recs) { r in
+                        Group {
+                            if r.surveyed == true {
+                                NavigationLink {
+                                    AdmuteReviewView(client: store.client, name: r.name)
+                                } label: {
+                                    row(r)
+                                }
+                            } else {
+                                row(r)
+                            }
+                        }
                         .swipeActions { actions(r) }
                         .contextMenu { actions(r) }
+                    }
+                } footer: {
+                    Text("Tap a surveyed recording to review its mutes. Swipe one to survey it.")
                 }
             } else if store.error == nil {
                 HStack { Spacer(); ProgressView(); Spacer() }
             }
         }
         .navigationTitle("Recordings")
-        .refreshable { await store.refreshRecordings() }
-        .polling(every: 10) { await store.refreshRecordings() }
+        .refreshable {
+            await store.refreshRecordings()
+            await store.refreshScene()
+        }
+        .polling(every: 10) {
+            await store.refreshRecordings()
+            await store.refreshScene()
+        }
         .noticeAlert(Binding(get: { store.notice }, set: { store.notice = $0 }))
+    }
+
+    private func sceneSection(_ scene: AdmuteScene) -> some View {
+        Section {
+            if scene.trained {
+                LabeledContent("Scene check", value: "trained")
+                if let titles = scene.titles, !titles.isEmpty {
+                    Text("Used for " + titles.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
+                }
+                if let n = scene.trainedOn?.count {
+                    Text("Learned from \(n) reviewed game\(n == 1 ? "" : "s")"
+                         + (scene.seconds.map { ", \(Format.duration($0)) of video" } ?? ""))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                LabeledContent("Scene check", value: "not trained yet")
+            }
+            Button {
+                Task { await store.train() }
+            } label: {
+                Label(scene.trained ? "Train again on reviewed games" : "Train on reviewed games", systemImage: "brain")
+            }
+        } footer: {
+            Text("An image model learned from your reviewed games decides what's an ad. Review more games, then train again to make it better.")
+        }
     }
 
     private func row(_ r: AdmuteRecordings.Recording) -> some View {
@@ -312,11 +393,16 @@ struct AdmuteRecordingsView: View {
                 if let job = r.job {
                     Badge(text: (job.what ?? "Job") + (job.progress.map { " · \($0)" } ?? ""), color: .blue)
                 } else if r.surveyed == true {
-                    Badge(text: "\(r.breaks ?? 0) breaks", color: .green)
+                    Badge(text: "\(r.breaks ?? 0) mutes", color: .green)
                 } else {
                     Badge(text: "not surveyed")
                 }
-                if r.labelled == true { Badge(text: "labelled", color: .purple) }
+                if r.labelled == true {
+                    Badge(text: "reviewed", color: .purple)
+                } else if let c = r.checked, c > 0, r.surveyed == true {
+                    Badge(text: "\(c) of \(r.breaks ?? 0) checked", color: .orange)
+                }
+                if r.missedChecked == true { Badge(text: "missed ads checked", color: .purple) }
             }
         }
     }

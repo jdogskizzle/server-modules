@@ -128,10 +128,15 @@ struct ServerImage: View {
     let client: APIClient
     let path: String
     var contentMode: ContentMode = .fill
+    var query: [URLQueryItem] = []
     @State private var image: UIImage?
     @State private var failed = false
 
     private static let cache = NSCache<NSString, UIImage>()
+
+    private var cacheKey: String {
+        "\(client.identity)|\(path)?" + query.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
+    }
 
     var body: some View {
         ZStack {
@@ -145,11 +150,11 @@ struct ServerImage: View {
                     }
             }
         }
-        .task(id: path) {
-            let key = "\(client.identity)|\(path)" as NSString
+        .task(id: cacheKey) {
+            let key = cacheKey as NSString
             if let hit = Self.cache.object(forKey: key) { image = hit; return }
             do {
-                let data = try await client.data("GET", path)
+                let data = try await client.data("GET", path, query: query)
                 if let img = UIImage(data: data) {
                     Self.cache.setObject(img, forKey: key)
                     image = img
