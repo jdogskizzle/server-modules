@@ -1,3 +1,4 @@
+import AVKit
 import SwiftUI
 
 // MARK: - Models
@@ -112,6 +113,14 @@ final class AdmuteReview {
     var pick: Double?
     private var saveTask: Task<Void, Never>?
 
+    /// The recording as HLS (the studio's hls.m3u8), and where it's playing.
+    var player: AVPlayer?
+    var now: Double = 0
+    /// Whether playback is muted right now (inside the mute being checked or fixed).
+    var mutedNow = false
+    var videoError: String?
+    private var timeObserver: Any?
+
     init(client: APIClient, name: String) {
         self.client = client
         self.name = name
@@ -150,6 +159,68 @@ final class AdmuteReview {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    // ----- video -----
+
+    /// The span that's muted while playing: the one being fixed, or the mute being checked.
+    var currentSpan: [Double]? {
+        if let edit { return edit }
+        if step == .mutes, mutes.indices.contains(index) { return [mutes[index].s, mutes[index].e] }
+        return nil
+    }
+
+    /// Opens the recording's HLS stream with the app's session (cookies for formlogin,
+    /// or the proxy's login header).
+    func startVideo() async {
+        guard player == nil, surveyed, loaded else { return }
+        do {
+            let cookies = try await client.webCookies()
+            var options: [String: Any] = [AVURLAssetHTTPCookiesKey: cookies]
+            if let name = client.headerName, let value = client.headerValue, !name.isEmpty {
+                options["AVURLAssetHTTPHeaderFieldsKey"] = [name: value]
+            }
+            let url = client.url("\(path)/hls.m3u8", query: [URLQueryItem(name: "h", value: "540")])
+            // Play sound even with the ring/silent switch on: judging ads needs it.
+            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+            let p = AVPlayer(playerItem: AVPlayerItem(asset: AVURLAsset(url: url, options: options)))
+            timeObserver = p.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600),
+                                                     queue: .main) { [weak self] t in
+                MainActor.assumeIsolated { self?.tick(t.seconds) }
+            }
+            player = p
+            videoError = nil
+            if let sp = currentSpan { seek(sp[0] - 5, play: false) }
+        } catch is CancellationError {
+        } catch {
+            videoError = error.localizedDescription
+        }
+    }
+
+    func stopVideo() {
+        player?.pause()
+        if let timeObserver { player?.removeTimeObserver(timeObserver) }
+        timeObserver = nil
+        player = nil
+    }
+
+    private func tick(_ t: Double) {
+        guard t.isFinite else { return }
+        now = t
+        if let item = player?.currentItem, item.status == .failed {
+            videoError = item.error?.localizedDescription ?? "The video couldn't be played."
+        }
+        let m = currentSpan.map { t >= $0[0] && t < $0[1] } ?? false
+        if player?.isMuted != m { player?.isMuted = m }
+        if mutedNow != m { mutedNow = m }
+    }
+
+    func seek(_ t: Double, play: Bool = true) {
+        guard let player else { return }
+        let time = CMTime(seconds: max(0, min(t, length)), preferredTimescale: 600)
+        let tolerance = CMTime(seconds: 0.25, preferredTimescale: 600)
+        player.seek(to: time, toleranceBefore: tolerance, toleranceAfter: tolerance)
+        if play { player.play() }
     }
 
     var ads: [AdmuteAd] { labels.ads.map(AdmuteAd.init) }
@@ -195,12 +266,14 @@ final class AdmuteReview {
         } else {
             index = mutes.count
             edit = nil
+            player?.pause()
         }
     }
 
     func go(_ i: Int) {
         index = max(0, min(i, mutes.count - 1))
         edit = nil
+        if mutes.indices.contains(index) { seek(mutes[index].s - 5) }
     }
 
     // ----- step 2: missed ads -----
@@ -349,7 +422,11 @@ struct AdmuteReviewView: View {
                 }
             }
         }
-        .task { if !model.loaded { await model.load() } }
+        .task {
+            if !model.loaded { await model.load() }
+            await model.startVideo()
+        }
+        .onDisappear { model.stopVideo() }
         .sensoryFeedback(.selection, trigger: model.index)
     }
 
@@ -357,6 +434,7 @@ struct AdmuteReviewView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
+                video
                 Picker("Step", selection: $model.step) {
                     Text("1. Check the mutes").tag(AdmuteReview.Step.mutes)
                     Text("2. Missed ads").tag(AdmuteReview.Step.missed)
@@ -400,6 +478,46 @@ struct AdmuteReviewView: View {
         }
     }
 
+    @ViewBuilder
+    private var video: some View {
+        if let player = model.player {
+            VideoPlayer(player: player)
+                .aspectRatio(16 / 9, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(alignment: .topLeading) {
+                    Text(model.mutedNow ? "MUTED" : "sound on")
+                        .font(.caption2.weight(.bold))
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(model.mutedNow ? Color.red : Color.black.opacity(0.55), in: Capsule())
+                        .foregroundStyle(.white)
+                        .padding(8)
+                        .allowsHitTesting(false)
+                }
+                .overlay(alignment: .topTrailing) {
+                    Text(AdmuteTime.hms(model.now))
+                        .font(.caption2.monospacedDigit())
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Color.black.opacity(0.55), in: Capsule())
+                        .foregroundStyle(.white)
+                        .padding(8)
+                        .allowsHitTesting(false)
+                }
+        }
+        if let e = model.videoError {
+            HStack {
+                Text("Video unavailable: \(e)").font(.caption).foregroundStyle(.red)
+                Spacer()
+                Button("Retry") {
+                    Task {
+                        model.stopVideo()
+                        await model.startVideo()
+                    }
+                }
+                .font(.caption)
+            }
+        }
+    }
+
     // MARK: Step 1
 
     @ViewBuilder
@@ -437,14 +555,27 @@ struct AdmuteReviewView: View {
 
             if model.edit != nil || m.e - m.s > 25 {
                 FrameStrip(model: model, title: "Around the start", times: strip(around: model.edit != nil ? model.anchors[0] : m.s),
-                           muted: span, selected: model.edit?[0]) { model.set(0, $0) }
+                           muted: span, selected: model.edit?[0]) { t in
+                    if model.edit != nil { model.set(0, t); model.seek(t, play: false) } else { model.seek(t) }
+                }
                 FrameStrip(model: model, title: "Around the end", times: strip(around: model.edit != nil ? model.anchors[1] : m.e),
-                           muted: span, selected: model.edit?[1]) { model.set(1, $0) }
+                           muted: span, selected: model.edit?[1]) { t in
+                    if model.edit != nil { model.set(1, t); model.seek(t, play: false) } else { model.seek(t) }
+                }
             } else {
                 FrameStrip(model: model, title: "The mute", times: strip(from: m.s - 8, to: m.e + 8),
-                           muted: span, selected: nil, onTap: nil)
+                           muted: span, selected: nil) { model.seek($0) }
             }
-            Text("Red is what got muted.").font(.caption).foregroundStyle(.secondary)
+            Text(model.player == nil ? "Red is what got muted." : "Red is what got muted. Tap a picture to play from there.")
+                .font(.caption).foregroundStyle(.secondary)
+            if model.player != nil {
+                Button {
+                    model.seek((model.edit?[0] ?? m.s) - 5)
+                } label: {
+                    Label("Play from just before", systemImage: "play.fill").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
 
             if model.edit != nil {
                 FixTiming(model: model, intro: "Tap the first picture of the ad in the start pictures, and the first picture of the game coming back in the end pictures.",
@@ -501,9 +632,9 @@ struct AdmuteReviewView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Mark the missed ad").font(.title3.weight(.semibold))
                 FrameStrip(model: model, title: "Around the start", times: strip(around: model.anchors[0]),
-                           muted: model.edit, selected: model.edit?[0]) { model.set(0, $0) }
+                           muted: model.edit, selected: model.edit?[0]) { t in model.set(0, t); model.seek(t, play: false) }
                 FrameStrip(model: model, title: "Around the end", times: strip(around: model.anchors[1]),
-                           muted: model.edit, selected: model.edit?[1]) { model.set(1, $0) }
+                           muted: model.edit, selected: model.edit?[1]) { t in model.set(1, t); model.seek(t, play: false) }
                 FixTiming(model: model, intro: "Tap the first picture of the ad, and the first picture of the game coming back.",
                           saveTitle: "Save ad") { model.saveMissed() }
             }
@@ -519,6 +650,7 @@ struct AdmuteReviewView: View {
                     ForEach(times, id: \.self) { t in
                         Button {
                             model.pick = Double(t)
+                            model.seek(Double(t))
                         } label: {
                             VStack(spacing: 2) {
                                 FrameImage(model: model, t: Double(t))
@@ -603,7 +735,7 @@ struct FixTiming: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(intro).font(.callout)
+            Text(intro + (model.player != nil ? " Or play the video and tap Now at the right moment." : "")).font(.callout)
             if let sp = model.edit {
                 row("Ad starts", sp[0], k: 0)
                 row("Game back", sp[1], k: 1)
@@ -631,6 +763,10 @@ struct FixTiming: View {
             Text(AdmuteTime.hms(t)).font(.body.monospacedDigit()).frame(minWidth: 64)
             Button("+1") { model.nudge(k, 1) }
             Button("+5") { model.nudge(k, 5) }
+            if model.player != nil {
+                Button("Now") { model.set(k, model.now) }
+                    .tint(.accentColor)
+            }
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
