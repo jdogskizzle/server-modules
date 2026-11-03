@@ -201,6 +201,11 @@ struct AdmuteView: View {
                         Label("Recordings and review", systemImage: "film.stack")
                     }
                     NavigationLink {
+                        AdmuteSoundsView(client: store.client)
+                    } label: {
+                        Label("Sounds: sponsor reads and jingles", systemImage: "waveform")
+                    }
+                    NavigationLink {
                         AdmuteJobsView(store: store)
                     } label: {
                         Label("Jobs", systemImage: "gearshape.2")
