@@ -1,11 +1,11 @@
 {
   "note": "The last commit of each server repo whose changes the app has been checked against. Updated by the daily upstream check (docs/upstream-check.md).",
   "repos": {
-    "miner": {"commit": "ad8e03123999234d32bdf9597247c1ac79f5a692", "module": "ServerModules/Modules/Miner"},
-    "musicflow": {"commit": "34b1288196f60605e096674f1485ff2749a5e2ab", "module": "ServerModules/Modules/MusicFlow"},
-    "mcpanel": {"commit": "077d95071e57cb48ab375c1ffed94daf6290462b", "module": "ServerModules/Modules/MCPanel"},
-    "ledger": {"commit": "fd4018f0f0435e4a709bba860a6fb5e484fd1414", "module": "ServerModules/Modules/Ledger"},
-    "admute": {"commit": "fd82f205149a8a87df5e2af6ea3cb87869dbc4e7", "module": "ServerModules/Modules/Admute"},
+    "miner": {"commit": "e21caee852e1bbcb757531175949a5e04e8278d8", "module": "ServerModules/Modules/Miner"},
+    "musicflow": {"commit": "0a86522796623eac62f104f56a4869b576694c84", "module": "ServerModules/Modules/MusicFlow"},
+    "mcpanel": {"commit": "28e12268c98378d9f4e9905ecdeb099139eef617", "module": "ServerModules/Modules/MCPanel"},
+    "ledger": {"commit": "79fbf51512a9aa7d9e08f3dd11f5fd9cc63bf894", "module": "ServerModules/Modules/Ledger"},
+    "admute": {"commit": "84f4d7122885c33add7d0b9d0767eb9b8965a152", "module": "ServerModules/Modules/Admute"},
     "dvr-guard": {"commit": "343ea4da42ddc1463f2cd4e90254717f5da2c945", "module": "ServerModules/Modules/DVR"},
     "formlogin": {"commit": "c2cc1a0c81562edbd45e8ec9fb6aa610fec77969", "module": "ServerModules/Core/FormSession.swift"}
   }
