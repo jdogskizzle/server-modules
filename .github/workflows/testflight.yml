@@ -58,6 +58,10 @@ jobs:
           printf '%s\n' "$KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
           echo "KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
 
+      # The archive is left unsigned: signing it would need an Apple Development
+      # certificate, and a fresh build machine creates a new one every run until the
+      # account hits Apple's limit. The upload step below signs the app for the App Store
+      # with Apple's cloud-managed distribution certificate instead.
       - name: Archive
         run: |
           set -o pipefail
@@ -67,12 +71,10 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/ServerModules.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$KEY_PATH" \
-            -authenticationKeyID "$KEY_ID" \
-            -authenticationKeyIssuerID "$ISSUER_ID" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             2>&1 | tee "$RUNNER_TEMP/archive.log" | grep -E "error:|warning: .*(sign|profile|certificate)|ARCHIVE (SUCCEEDED|FAILED)" || true
           grep -q "ARCHIVE SUCCEEDED" "$RUNNER_TEMP/archive.log"
