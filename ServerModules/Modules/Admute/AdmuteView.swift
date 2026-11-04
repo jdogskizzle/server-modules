@@ -203,7 +203,7 @@ struct AdmuteView: View {
                     NavigationLink {
                         AdmuteSoundsView(client: store.client)
                     } label: {
-                        Label("Sounds: sponsor reads and jingles", systemImage: "waveform")
+                        Label("Sounds: sponsor lines and jingles", systemImage: "waveform")
                     }
                     NavigationLink {
                         AdmuteJobsView(store: store)

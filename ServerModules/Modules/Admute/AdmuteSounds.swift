@@ -3,7 +3,7 @@ import SwiftUI
 
 // MARK: - Models (admute studio: /api/sounds, app/listen.py)
 
-/// GET /api/sounds: sponsor reads per recording, sounds heard more than once, and the answers.
+/// GET /api/sounds: sponsor lines per recording, sounds heard more than once, and the answers.
 struct AdmuteSoundsPage: Decodable {
     let recordings: [Recording]
     let sounds: [Sound]
@@ -28,8 +28,22 @@ struct AdmuteSoundsPage: Decodable {
         let end: Double
         let text: String
         let context: String?
-        /// read (would be muted), mention (under 3 s) or segment (a brand-named segment)
+        /// billboard (a sponsor tag or slogan: muted), credit (a feature's sponsor named: left on)
+        /// or segment (a brand in a segment's name: left on). Older studios: read or mention.
         let kind: String
+        /// The answer's key; it follows the line when it is found again with a different start.
+        let key: String?
+
+        /// Whether the rule would mute it.
+        var muted: Bool { kind == "billboard" || kind == "read" }
+
+        var kindLabel: String {
+            switch kind {
+            case "billboard", "read": return "billboard: would mute"
+            case "credit", "mention": return "sponsor credit: left on"
+            default: return "brand-named segment: left on"
+            }
+        }
     }
 
     /// A stretch of sound heard more than once.
@@ -41,6 +55,8 @@ struct AdmuteSoundsPage: Decodable {
         let length: Double?
         let recordings: Int?
         let text: String?
+        /// The answer's key; it follows the sound when it is found again under another id.
+        let key: String?
     }
 
     struct Place: Decodable, Hashable {
@@ -148,7 +164,7 @@ final class AdmuteSoundsStore {
     var busy: Bool { page?.recordings.contains { $0.job != nil } ?? false }
 
     static func readKey(_ rec: AdmuteSoundsPage.Recording, _ read: AdmuteSoundsPage.Read) -> String {
-        "read:\(rec.name)@\(Int(read.start.rounded()))"
+        read.key ?? "read:\(rec.name)@\(Int(read.start.rounded()))"
     }
 
     /// Sets an answer; picking the current one again clears it, like the studio.
@@ -236,7 +252,7 @@ struct AdmuteSoundsView: View {
                 Text("Can't play: \(e)").font(.caption).foregroundStyle(.red)
             }
         } footer: {
-            Text("Sponsor reads would be muted while the picture plays on; jingles and network promos mark where breaks start and end. Confirm what each one is.")
+            Text("Sponsor billboards would be muted while the picture plays on; jingles and network promos mark where breaks start and end. Confirm what each one is.")
         }
     }
 
@@ -266,7 +282,7 @@ struct AdmuteSoundsView: View {
                 }
             }
             Button {
-                Task { await store.startJob(kind: "sounds", name: "", started: "Finding sponsor reads and repeated sounds. Follow it under Jobs.") }
+                Task { await store.startJob(kind: "sounds", name: "", started: "Finding sponsor lines and repeated sounds. Follow it under Jobs.") }
             } label: {
                 Label("Find reads and repeated sounds", systemImage: "waveform.badge.magnifyingglass")
             }
@@ -279,41 +295,42 @@ struct AdmuteSoundsView: View {
         }
     }
 
-    // MARK: Sponsor reads
+    // MARK: Sponsor lines
 
     @ViewBuilder
     private func readsSection(_ page: AdmuteSoundsPage) -> some View {
         let rows = page.recordings.flatMap { rec in
-            rec.reads.compactMap { read -> (rec: AdmuteSoundsPage.Recording, read: AdmuteSoundsPage.Read, key: String)? in
-                let key = AdmuteSoundsStore.readKey(rec, read)
-                if !allReads && read.kind != "read" && store.verdicts[key] == nil { return nil }
-                return (rec, read, key)
+            rec.reads.compactMap { read -> (id: String, rec: AdmuteSoundsPage.Recording, read: AdmuteSoundsPage.Read, key: String)? in
+                if !allReads && !read.muted { return nil }
+                return ("\(rec.name)@\(read.start)", rec, read, AdmuteSoundsStore.readKey(rec, read))
             }
         }
         let total = page.recordings.reduce(0) { $0 + $1.reads.count }
         Section {
-            Toggle("Also short mentions and brand-named segments", isOn: $allReads)
+            Toggle("Also sponsor credits and brand-named segments", isOn: $allReads)
             if rows.isEmpty {
-                Text(total > 0 ? "None to show." : "Listen to a recording, then find reads.")
+                Text(total > 0 ? "None to show." : "Listen to a recording, then find sponsor lines.")
                     .foregroundStyle(.secondary)
             }
-            ForEach(rows, id: \.key) { row in
+            ForEach(rows, id: \.id) { row in
                 readRow(row.rec, row.read, key: row.key)
             }
         } header: {
-            Text("Sponsor reads")
+            Text("Sponsor lines")
         } footer: {
-            Text("Mute: an ad read, to mute. Keep: fine to hear. Tap again to clear.")
+            Text("Billboards (the broadcast's sponsor tags and slogans) would be muted; a feature's sponsor credit or a brand-named segment is left on. Mute or Keep says what you'd want. Tap again to clear.")
         }
     }
 
     private func readRow(_ rec: AdmuteSoundsPage.Recording, _ read: AdmuteSoundsPage.Read, key: String) -> some View {
         let v = store.verdicts[key]
-        let kindLabel = read.kind == "read" ? "would mute" : read.kind == "mention" ? "short mention" : "brand-named segment"
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text(AdmuteTime.hms(read.start)).font(.caption.monospacedDigit())
-                Badge(text: kindLabel, color: read.kind == "read" ? .orange : .secondary)
+                Badge(text: read.kindLabel, color: read.muted ? .orange : .secondary)
+                if let v, (v == "mute") != read.muted {
+                    Badge(text: "you said \(v)", color: .red)
+                }
                 Text(rec.title.replacingOccurrences(of: "NFL Football ", with: ""))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
@@ -365,7 +382,7 @@ struct AdmuteSoundsView: View {
     }
 
     private func soundRow(_ s: AdmuteSoundsPage.Sound) -> some View {
-        let key = "sound:\(s.id)"
+        let key = s.key ?? "sound:\(s.id)"
         let v = store.verdicts[key]
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {

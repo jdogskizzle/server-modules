@@ -20,7 +20,8 @@ final class MinerStore {
     }
 
     /// POST /api/control: {"paused": Bool}, {"pin": key or ""}, {"check": true},
-    /// {"power_mode": mode}, {"benchmark": key}, {"benchmark_cancel": true}.
+    /// {"power_mode": mode}, {"benchmark": key}, {"benchmark_cancel": true},
+    /// {"power_price": $/kWh or null for the .env default}.
     func control(_ body: JSONObject) async {
         sending = true
         defer { sending = false }
@@ -36,6 +37,8 @@ final class MinerStore {
 struct MinerView: View {
     @State private var store: MinerStore
     @State private var confirm: Confirm?
+    @State private var editingRate = false
+    @State private var rateText = ""
 
     init(client: APIClient) {
         _store = State(initialValue: MinerStore(client: client))
@@ -104,6 +107,15 @@ struct MinerView: View {
             } footer: {
                 Text(modeNote(s))
             }
+            if s.power != nil {
+                Section {
+                    power(s)
+                } header: {
+                    Text("Power cost")
+                } footer: {
+                    Text(powerNote(s))
+                }
+            }
             Section {
                 coins(s)
             } header: {
@@ -113,6 +125,71 @@ struct MinerView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .alert("Electricity price", isPresented: $editingRate) {
+            TextField("¢/kWh", text: $rateText).keyboardType(.decimalPad)
+            Button("Save") { saveRate() }
+            if s.control?.powerPrice != nil, s.power?.envRate != nil {
+                Button("Use the .env price") { Task { await store.control(["power_price": .null]) } }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("In cents per kWh, the energy charge only (e.g. 13.38).")
+        }
+    }
+
+    // MARK: Power cost
+
+    @ViewBuilder
+    private func power(_ s: MinerStatus) -> some View {
+        let rate = s.power?.rate
+        if s.hashing, s.watchdog?.state == "mining", let est = s.live?["miner_est_usd_per_day"],
+           let cost = s.powerPerDay(s.live?["gpu_power_watts"]) {
+            LabeledContent("Now, after power") {
+                Text(Format.usd(est - cost) + "/day").monospacedDigit()
+            }
+        }
+        ForEach(MinerStatus.powerWindows, id: \.key) { w in
+            let win = s.power?.windows?[w.key]
+            let cost: Double? = rate.flatMap { r in win?.kwh.map { $0 * r } }
+            let net: Double? = cost.flatMap { c in win?.earned.map { $0 - c } }
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(w.label)
+                    Spacer()
+                    Text(net.map { "Net " + Format.usd($0) } ?? "–")
+                        .font(.body.monospacedDigit())
+                        .foregroundStyle(net.map { $0 < 0 ? Color.red : Color.green } ?? Color.secondary)
+                }
+                Text("\(Format.number(win?.kwh, digits: 1)) kWh · cost \(Format.usd(cost)) · earned \(Format.usd(win?.earned))"
+                     + (win?.miningS.map { " · mined \(Format.duration($0))" } ?? ""))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        Button {
+            rateText = rate.map { String(format: "%.2f", $0 * 100) } ?? ""
+            editingRate = true
+        } label: {
+            LabeledContent("Electricity", value: rate.map { String(format: "%.2f¢/kWh", $0 * 100) } ?? "Not set")
+        }
+        .disabled(store.sending)
+    }
+
+    private func powerNote(_ s: MinerStatus) -> String {
+        var note = s.power?.rate == nil
+            ? "Set the electricity price to see the cost. "
+            : s.power?.rateSource == "panel" ? "Price set in the panel. " : "Price from the miner's .env. "
+        note += "Energy is the GPU's while mining; earnings are estimates."
+        if let since = s.power?.since { note += " Recording began \(Format.ago(since, now: s.now))." }
+        return note
+    }
+
+    private func saveRate() {
+        let text = rateText.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        guard let cents = Double(text), (0...500).contains(cents) else {
+            store.error = "Enter a price in cents per kWh, between 0 and 500."
+            return
+        }
+        Task { await store.control(["power_price": .number(cents / 100)]) }
     }
 
     private struct StateLook {

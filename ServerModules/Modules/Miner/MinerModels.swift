@@ -5,6 +5,8 @@ struct MinerStatus: Decodable {
     let now: Double
     let watchdog: Watchdog?
     let control: Control?
+    /// Energy used while mining and what it cost (missing on older panels).
+    let power: Power?
     let active: Active?
     let estimates: Estimates?
     let tuning: [String: Tuning]?
@@ -16,7 +18,7 @@ struct MinerStatus: Decodable {
     let live: [String: Double]?
 
     enum CodingKeys: String, CodingKey {
-        case now, watchdog, control, active, estimates, tuning, benchmark, coins, live
+        case now, watchdog, control, power, active, estimates, tuning, benchmark, coins, live
         case configPowerMode = "config_power_mode"
         case configPin = "config_pin"
         case checkMinutes = "check_minutes"
@@ -41,10 +43,44 @@ struct MinerStatus: Decodable {
         let powerMode: String?
         let checkRequested: Double?
         let benchmark: BenchmarkRequest?
+        /// Electricity price set in the panel, $/kWh (nil: the .env default).
+        let powerPrice: Double?
         enum CodingKeys: String, CodingKey {
             case paused, pin, benchmark
             case powerMode = "power_mode"
             case checkRequested = "check_requested"
+            case powerPrice = "power_price"
+        }
+    }
+
+    /// The GPU's energy while mining, totalled per period (state/power.json).
+    struct Power: Decodable {
+        /// Electricity price in $/kWh, or nil when none is set.
+        let rate: Double?
+        /// "panel", ".env" or nil.
+        let rateSource: String?
+        /// POWER_USD_PER_KWH from the miner's .env.
+        let envRate: Double?
+        /// When power was first recorded.
+        let since: Double?
+        /// day, week, month and all.
+        let windows: [String: PowerWindow]?
+        enum CodingKeys: String, CodingKey {
+            case rate, since, windows
+            case rateSource = "rate_source"
+            case envRate = "env_rate"
+        }
+    }
+
+    struct PowerWindow: Decodable {
+        /// Seconds spent mining.
+        let miningS: Double?
+        let kwh: Double?
+        /// Estimated earnings while mining, $.
+        let earned: Double?
+        enum CodingKeys: String, CodingKey {
+            case kwh, earned
+            case miningS = "mining_s"
         }
     }
 
@@ -176,6 +212,16 @@ extension MinerStatus {
     var currentMode: String {
         if let m = control?.powerMode, Self.modes.contains(m) { return m }
         return configPowerMode ?? "efficient"
+    }
+
+    static let powerWindows: [(key: String, label: String)] = [
+        ("day", "Last day"), ("week", "Last week"), ("month", "Last 30 days"), ("all", "All time"),
+    ]
+
+    /// $/day of electricity for a GPU drawing `watts` all day, or nil without a price.
+    func powerPerDay(_ watts: Double?) -> Double? {
+        guard let rate = power?.rate, let watts, watts > 0 else { return nil }
+        return watts * 24 / 1000 * rate
     }
 
     var paused: Bool { control?.paused ?? false }
