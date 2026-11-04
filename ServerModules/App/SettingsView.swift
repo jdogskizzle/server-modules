@@ -7,6 +7,22 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section {
+                    ForEach(0..<ServerSettings.tabSlotCount, id: \.self) { slot in
+                        Picker("Tab \(slot + 1)", selection: Binding(
+                            get: { settings.tabSlots[slot] },
+                            set: { settings.setTab(slot, $0) })) {
+                            Text("None").tag(ServerKind?.none)
+                            ForEach(ServerKind.allCases) { kind in
+                                Label(kind.title, systemImage: kind.systemImage).tag(ServerKind?.some(kind))
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Tabs")
+                } footer: {
+                    Text("Up to three services to show as their own tabs, between Home and Settings. They stay on Home too.")
+                }
+                Section {
                     ForEach(ServerKind.allCases) { kind in
                         NavigationLink {
                             ServerEditView(kind: kind)

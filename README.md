@@ -2,7 +2,8 @@
 
 An iPhone and iPad app (SwiftUI, iOS 17+) for the home-server apps. **Home** lists every
 service with a live one-line status (what's recording, what's mining, the fund balance…);
-tap one for its full screen. **Settings** holds each server's address and login.
+tap one for its full screen. Up to three services can also have their own tabs between Home
+and Settings (Settings → Tabs). **Settings** holds each server's address and login.
 
 | Service | Server | What you can do |
 |---|---|---|

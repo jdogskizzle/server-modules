@@ -83,6 +83,11 @@ final class ServerSettings {
 
     private static let defaultsKey = "serverConfigs.v1"
 
+    /// Services shown as tabs between Home and Settings: three slots, each empty or a service.
+    private(set) var tabSlots: [ServerKind?]
+    static let tabSlotCount = 3
+    private static let tabsKey = "tabSlots.v1"
+
     /// One sign-in session per server, shared by every client made for it, so screens
     /// don't each sign in. Replaced when the URL or login changes.
     @ObservationIgnored private var formSessions: [ServerKind: FormSession] = [:]
@@ -95,11 +100,29 @@ final class ServerSettings {
         }
         for kind in ServerKind.allCases where loaded[kind] == nil { loaded[kind] = ServerConfig() }
         configs = loaded
+        let saved = UserDefaults.standard.stringArray(forKey: Self.tabsKey) ?? []
+        tabSlots = (0..<Self.tabSlotCount).map { i in i < saved.count ? ServerKind(rawValue: saved[i]) : nil }
     }
 
     func config(_ kind: ServerKind) -> ServerConfig { configs[kind] ?? ServerConfig() }
 
     func secret(_ kind: ServerKind) -> String { Keychain.read("secret.\(kind.rawValue)") ?? "" }
+
+    /// The pinned services, in tab order.
+    var pinnedTabs: [ServerKind] { tabSlots.compactMap { $0 } }
+
+    /// Puts a service in a tab slot (nil empties it). A service already in another slot
+    /// moves here, so each one has at most one tab.
+    func setTab(_ slot: Int, _ kind: ServerKind?) {
+        guard tabSlots.indices.contains(slot) else { return }
+        var slots = tabSlots
+        if let kind {
+            for i in slots.indices where slots[i] == kind { slots[i] = nil }
+        }
+        slots[slot] = kind
+        tabSlots = slots
+        UserDefaults.standard.set(slots.map { $0?.rawValue ?? "" }, forKey: Self.tabsKey)
+    }
 
     func save(_ kind: ServerKind, config: ServerConfig, secret: String) {
         var c = config

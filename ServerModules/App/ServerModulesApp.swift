@@ -13,6 +13,7 @@ struct ServerModulesApp: App {
 }
 
 struct RootView: View {
+    @Environment(ServerSettings.self) private var settings
     @AppStorage("selectedTab") private var tab = "home"
 
     var body: some View {
@@ -20,14 +21,23 @@ struct RootView: View {
             HomeView()
                 .tabItem { Label("Home", systemImage: "square.grid.2x2") }
                 .tag("home")
+            ForEach(settings.pinnedTabs) { kind in
+                NavigationStack { ServiceScreen(kind: kind) }
+                    .tabItem { Label(kind.title, systemImage: kind.systemImage) }
+                    .tag(kind.rawValue)
+            }
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
                 .tag("settings")
         }
-        .onAppear {
-            // Earlier versions had a tab per service.
-            if tab != "home" && tab != "settings" { tab = "home" }
-        }
+        .onAppear(perform: keepTabValid)
+        .onChange(of: settings.tabSlots) { keepTabValid() }
+    }
+
+    /// Back to Home when the selected tab no longer exists (unpinned, or from an older version).
+    private func keepTabValid() {
+        let valid = ["home", "settings"] + settings.pinnedTabs.map(\.rawValue)
+        if !valid.contains(tab) { tab = "home" }
     }
 }
 
