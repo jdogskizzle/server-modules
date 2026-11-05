@@ -5,7 +5,7 @@
     "musicflow": {"commit": "0a86522796623eac62f104f56a4869b576694c84", "module": "ServerModules/Modules/MusicFlow"},
     "mcpanel": {"commit": "28e12268c98378d9f4e9905ecdeb099139eef617", "module": "ServerModules/Modules/MCPanel"},
     "ledger": {"commit": "79fbf51512a9aa7d9e08f3dd11f5fd9cc63bf894", "module": "ServerModules/Modules/Ledger"},
-    "admute": {"commit": "52613d8e803428f6afd962840bb229dc2ca8d525", "module": "ServerModules/Modules/Admute"},
+    "admute": {"commit": "c69d0bc3dabe9d8270ff5330145ec220ff325f50", "module": "ServerModules/Modules/Admute"},
     "dvr-guard": {"commit": "343ea4da42ddc1463f2cd4e90254717f5da2c945", "module": "ServerModules/Modules/DVR"},
     "formlogin": {"commit": "c2cc1a0c81562edbd45e8ec9fb6aa610fec77969", "module": "ServerModules/Core/FormSession.swift"}
   }

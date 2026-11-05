@@ -33,6 +33,8 @@ struct AdmuteLive: Decodable {
         let state: String?
         let armed: Bool?
         let adsMuted: Int?
+        /// Sponsor billboards muted from the commentary (sports only; newer proxies).
+        let sponsorLinesMuted: Int?
         var id: String { channel }
 
         enum CodingKeys: String, CodingKey {
@@ -44,6 +46,7 @@ struct AdmuteLive: Decodable {
             case learningMinutesLeft = "learning_minutes_left"
             case logoScore = "logo_score"
             case adsMuted = "ads_muted"
+            case sponsorLinesMuted = "sponsor_lines_muted"
         }
     }
 
@@ -267,6 +270,9 @@ struct AdmuteView: View {
                 Label("\(s.viewers ?? 0)", systemImage: "person.fill")
                 if let t = s.openSeconds { Label(Format.duration(t), systemImage: "clock") }
                 if let n = s.adsMuted { Label("\(n) ads muted", systemImage: "speaker.slash") }
+                if let n = s.sponsorLinesMuted, n > 0 {
+                    Label("\(n) sponsor \(n == 1 ? "line" : "lines")", systemImage: "text.bubble")
+                }
             }
             .font(.caption)
             .foregroundStyle(.secondary)
