@@ -49,9 +49,11 @@ struct MCStatus: Decodable {
     let runningVersion: String?
     let memory: String?
     let cpu: String?
+    /// Memory moved to swap, e.g. "3.2 GiB" (sleeping servers; only when mcpanel can see cgroups).
+    let swap: String?
 
     enum CodingKeys: String, CodingKey {
-        case state, detail, players, memory, cpu
+        case state, detail, players, memory, cpu, swap
         case maxPlayers = "max_players"
         case runningVersion = "running_version"
     }

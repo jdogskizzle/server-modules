@@ -201,6 +201,9 @@ struct MCServerDetailView: View {
                     LabeledContent("CPU", value: s.status.cpu ?? "–")
                     LabeledContent("Memory", value: s.status.memory ?? "–")
                 }
+                if let swap = s.status.swap {
+                    LabeledContent("In swap", value: swap)
+                }
             }
 
             Section {
