@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct ServerModulesApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var settings = ServerSettings()
 
     var body: some Scene {
@@ -15,6 +16,7 @@ struct ServerModulesApp: App {
 struct RootView: View {
     @Environment(ServerSettings.self) private var settings
     @AppStorage("selectedTab") private var tab = "home"
+    @State private var push = PushManager.shared
 
     var body: some View {
         TabView(selection: $tab) {
@@ -32,6 +34,35 @@ struct RootView: View {
         }
         .onAppear(perform: keepTabValid)
         .onChange(of: settings.tabSlots) { keepTabValid() }
+        .task {
+            push.settings = settings
+            push.launch()
+        }
+        // A new notifier address or login: tell it about this iPhone again.
+        .onChange(of: settings.revision) { Task { await push.upload() } }
+        .sheet(item: Binding(get: { push.openAlertID.map(OpenAlert.init) },
+                             set: { push.openAlertID = $0?.id })) { open in
+            NavigationStack {
+                Group {
+                    if let client = settings.client(.notifier) {
+                        NotifierAlertView(client: client, alertID: open.id)
+                    } else {
+                        ContentUnavailableView("Alerts isn't set up", systemImage: "bell.badge",
+                                               description: Text("Set up Alerts (notifier) in Settings."))
+                    }
+                }
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { push.openAlertID = nil }
+                    }
+                }
+            }
+        }
+    }
+
+    /// The alert a tapped notification points to.
+    private struct OpenAlert: Identifiable {
+        let id: Int
     }
 
     /// Back to Home when the selected tab no longer exists (unpinned, or from an older version).
@@ -54,6 +85,7 @@ struct ServiceScreen: View {
         case .grafana: ModuleRoot(kind: kind) { GrafanaView(client: $0) }
         case .admute: ModuleRoot(kind: kind) { AdmuteView(client: $0) }
         case .dvr: ModuleRoot(kind: kind) { DVRView(client: $0) }
+        case .notifier: ModuleRoot(kind: kind) { NotifierView(client: $0) }
         }
     }
 }

@@ -76,15 +76,19 @@ struct ServiceWebPage: View {
     var path = ""
     /// An API call that needs a session, made first so the session is current.
     let probePath: String
+    /// A full address on the same server instead of `path` (e.g. a dashboard link from an alert).
+    var absoluteURL: URL? = nil
     @State private var cookies: [HTTPCookie]?
     @State private var error: String?
     @State private var reload = 0
     @State private var loading = true
 
+    private var pageURL: URL { absoluteURL ?? client.url(path) }
+
     var body: some View {
         Group {
             if let cookies {
-                ServiceWebView(url: client.url(path), cookies: cookies, reload: reload, loading: $loading)
+                ServiceWebView(url: pageURL, cookies: cookies, reload: reload, loading: $loading)
                     .ignoresSafeArea(edges: .bottom)
                     .overlay(alignment: .top) {
                         if loading { ProgressView().padding(.top, 8) }
@@ -105,7 +109,7 @@ struct ServiceWebPage: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                Link(destination: client.url(path)) { Image(systemName: "safari") }
+                Link(destination: pageURL) { Image(systemName: "safari") }
                 Button { reload += 1 } label: { Image(systemName: "arrow.clockwise") }
             }
         }

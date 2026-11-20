@@ -3,7 +3,7 @@ import Observation
 
 /// The server apps this client knows. The order is the order on the Home page.
 enum ServerKind: String, CaseIterable, Identifiable, Codable {
-    case musicflow, dvr, admute, miner, ledger, mcpanel, grafana
+    case musicflow, dvr, admute, notifier, miner, ledger, mcpanel, grafana
 
     var id: String { rawValue }
 
@@ -20,6 +20,10 @@ enum ServerKind: String, CaseIterable, Identifiable, Codable {
         case .admute:
             return ("TV ad mute", "admute studio", "speaker.slash", "https://homeserver/admute",
                     "admute's studio, behind your proxy (e.g. /admute).", "api/live", "Media")
+        case .notifier:
+            return ("Alerts", "notifier", "bell.badge", "https://homeserver/notifier",
+                    "notifier, behind your proxy (e.g. /notifier). Sign in with its Notifications user.",
+                    "api/summary", "Server")
         case .miner:
             return ("Miner", "GPU miner control", "cpu", "http://homeserver:8095",
                     "The miner's control panel (CONTROL_PORT, 8095 by default).", "api/status", "Server")

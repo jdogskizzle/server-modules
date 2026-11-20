@@ -17,6 +17,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Support/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Support/ServerModules.entitlements
         INFOPLIST_KEY_CFBundleDisplayName: Server Modules
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: Connects to your server apps on your home network.
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES

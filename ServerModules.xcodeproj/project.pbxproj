@@ -9,6 +9,7 @@
 /* Begin PBXFileReference section */
 		5E0D00000000000000000001 /* ServerModules.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ServerModules.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E0D00000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		5E0D00000000000000000003 /* ServerModules.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ServerModules.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -43,6 +44,7 @@
 			isa = PBXGroup;
 			children = (
 				5E0D00000000000000000002 /* Info.plist */,
+				5E0D00000000000000000003 /* ServerModules.entitlements */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -257,6 +259,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Support/ServerModules.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
@@ -288,6 +291,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Support/ServerModules.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";

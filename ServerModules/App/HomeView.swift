@@ -78,6 +78,13 @@ enum Summaries {
             }
             return ServiceSummary(text: "Idle")
 
+        case .notifier:
+            let s = try await c.get("api/summary", as: NotifierSummary.self)
+            let pushOff = s.push == "off" ? " · push off" : ""
+            guard s.firing > 0 else { return ServiceSummary(text: "All clear" + pushOff, tint: .green) }
+            return ServiceSummary(text: "\(s.firing) firing" + (s.critical > 0 ? " (\(s.critical) critical)" : "") + pushOff,
+                                  tint: s.critical > 0 ? .red : .orange, alert: true)
+
         case .dvr:
             let s = try await c.get("api/status", as: DVRStatus.self)
             let conflict = s.recordings.contains { $0.isActive && $0.conflict != nil }

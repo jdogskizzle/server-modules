@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyLists-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Push notifications from notifier. "development" here; App Store and TestFlight builds
+	     are signed with "production" when they're exported. -->
+	<key>aps-environment</key>
+	<string>development</string>
+	<!-- Critical alerts are time-sensitive, so they come through Focus. -->
+	<key>com.apple.developer.usernotifications.time-sensitive</key>
+	<true/>
+</dict>
+</plist>

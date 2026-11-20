@@ -12,6 +12,7 @@ and Settings (Settings → Tabs). **Settings** holds each server's address and l
 | Miner | [miner](https://github.com/jdogskizzle/miner) control panel | Live status (hashrate, $/day, GPU power and temperature, shares), pause/resume, power mode, pin a coin or go back to automatic, compare prices now, start or cancel a benchmark, coin ranking, power cost (energy, cost, earnings and net per day / week / month / all time) and the electricity price |
 | Music | [musicflow](https://github.com/jdogskizzle/musicflow) web app | Artists with missing albums, search Soulseek for them, review and pick a source per album, *Download and finish*, re-tag (with or without a new cover), activity with progress, retry/cancel/dismiss and logs, import a folder from the downloads, wanted format, disk space, Jellyfin scan |
 | Minecraft | [mcpanel](https://github.com/jdogskizzle/mcpanel) | Servers with players, version, CPU, memory and memory in swap while asleep; start, stop, restart, back up, restore a backup; change type, version, Java or memory; start-at-boot; add a server; task logs |
+| Alerts | [notifier](https://github.com/jdogskizzle/notifier) | Grafana alerts: what's firing (critical first) and recent resolved ones, each with its description, times, values and labels, and "Open dashboard" to the panel in the Dashboards web view. **Push notifications** to the iPhone (critical alerts are time-sensitive, so they come through Focus); tapping one opens the alert. Turn them on per iPhone, see the registered devices, send a test notification |
 | Dashboards | [Grafana](https://grafana.com) | Your dashboards (starred first, by folder, searchable), each opened inside the app with a time-range picker, signed in with the same session |
 | Ledger | [ledger](https://github.com/jdogskizzle/ledger) | Fund balance and payback progress, mining estimate, wishlist with progress and ETA (mark as bought), payouts / purchases / already spent with add, edit and delete, BTC price lookup, payback share, server specs |
 
@@ -76,6 +77,7 @@ use with its *Show on Home* switch.
 | Ledger | `http://<host>:8000` or `https://<proxy>/ledger` | `PORT` in the ledger's `.env` |
 | DVR | `https://<proxy>/dvr` | dvr-guard has no published port; its status page behind your proxy |
 | TV ad mute | `https://<proxy>/admute` | admute's studio (no published port) behind your proxy |
+| Alerts | `https://<proxy>/notifier` | notifier (no published port) behind your proxy; sign in with a Notifications user (formlogin). Push also needs notifier's APNs key, set up on the server |
 | Dashboards | `http://<host>:3000` or `https://<proxy>/grafana` | Grafana; sign in with a Grafana user (a viewer is enough) |
 
 Each server has its own sign-in page ([formlogin](https://github.com/jdogskizzle/formlogin)).
@@ -110,6 +112,7 @@ ServerModules/
     Grafana/      dashboard list and the in-app dashboard viewer
     DVR/          dvr-guard: recording now, schedule, recent, tuners
     Admute/       admute studio: live, events, recordings, jobs
+    Notifier/     alerts, alert detail, notification settings (push itself: Core/PushManager.swift)
 Support/Info.plist
 ```
 
